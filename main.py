@@ -1,6 +1,6 @@
 # main.py
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from contextlib import asynccontextmanager
 import sqlite3
 import os
@@ -29,19 +29,38 @@ boss_robot = FastAPI(title="FOIA Boss Robot", lifespan=lifespan)
 def build_front_desk():
     return html_content
 
-@boss_robot.post("/submit-request")
-def receive_form(agency: str, topic: str):
-    deadline = (datetime.now() + timedelta(seconds=10)).isoformat()
+@boss_robot.post("/upload-response/{tracking_number}")
+def upload_document(tracking_number: int, background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    filepath = f"inbox/{file.filename}"
+    with open(filepath, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    # Save the filepath to the database so we know where it is later!
     conn = sqlite3.connect("clipboard.db")
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO requests (agency, topic, status, extracted_text, due_date) 
-        VALUES (?, ?, ?, ?, ?)
-    """, (agency, topic, "SUBMITTED - Waiting for reply", "", deadline))
+    cursor.execute("UPDATE requests SET status = ?, filepath = ? WHERE id = ?", 
+                   ("PROCESSING - Backroom is reading the file", filepath, tracking_number))
     conn.commit()
-    tracking_number = cursor.lastrowid 
     conn.close()
-    return {"message": "Request sent!", "tracking_number": tracking_number, "due_date": deadline}
+
+    background_tasks.add_task(read_heavy_document, tracking_number, filepath)
+    return {"message": "Got it! The backroom is reading it."}
+
+# === NEW: THE SECURE DOWNLOAD ROUTE ===
+@boss_robot.get("/download/{tracking_number}")
+def download_document(tracking_number: int):
+    conn = sqlite3.connect("clipboard.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT filepath FROM requests WHERE id = ?", (tracking_number,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    # If we found the path in the database, and the file actually exists in the folder...
+    if result and result[0] and os.path.exists(result[0]):
+        # Send the file to the user's browser!
+        return FileResponse(path=result[0], filename=os.path.basename(result[0]), media_type='application/pdf')
+    
+    return {"error": "File not found on the server."}
 
 @boss_robot.get("/check-status/{tracking_number}")
 def check_clipboard(tracking_number: int):

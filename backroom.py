@@ -1,4 +1,4 @@
-# backroom.py (Top of the file)
+# backroom.py
 import sqlite3
 import pdfplumber
 from pdf2image import convert_from_path
@@ -12,8 +12,10 @@ from dotenv import load_dotenv
 from google import genai
 
 # --- CONFIGURATION ---
-load_dotenv()
+load_dotenv(override=True)
 my_secret_key = os.getenv("GEMINI_API_KEY")
+
+print(f"=== DEBUG: THE KEY IS: {my_secret_key} ===")
 
 # Create the AI client with the key from your safe
 client = genai.Client(api_key=my_secret_key)
@@ -77,39 +79,23 @@ def read_heavy_document(tracking_number: int, filepath: str):
         full_text = str(e)
         print(f"Backroom Reader Error: {e}")
 
-    # The AI Summarizer
+    # === NEW: THE CLOUD AI SUMMARIZER (v2 SDK) ===
     ai_summary = "No text to summarize."
     if full_text.strip() != "":
         print("Backroom Reader: Handing text to the Cloud AI for summarization...")
         try:
             prompt = f"Please provide a concise, 3-sentence summary of this government document:\n\n{full_text[:5000]}"
-            response = model.generate_content(prompt)
+            
+            # The NEW v2 syntax for generating content!
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+            )
+            
             ai_summary = response.text
             print("Backroom Reader: Cloud AI Summary complete!")
         except Exception as e:
-            ai_summary = "Cloud AI got confused: " + str(e)
-            print(f"AI Error: {e}")
-
-    # Update Clipboard
-    conn = sqlite3.connect("clipboard.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE requests SET status = ?, extracted_text = ?, summary = ? WHERE id = ?", 
-                   (status_update, full_text, ai_summary, tracking_number))
-    conn.commit()
-    conn.close()
-    print(f"Backroom Reader: Finished request {tracking_number}!")
-
-    # The AI Summarizer
-    ai_summary = "No text to summarize."
-    if full_text.strip() != "":
-        print("Backroom Reader: Handing text to the Cloud AI for summarization...")
-        try:
-            prompt = f"Please provide a concise, 3-sentence summary of this government document:\n\n{full_text[:5000]}"
-            response = model.generate_content(prompt)
-            ai_summary = response.text
-            print("Backroom Reader: Cloud AI Summary complete!")
-        except Exception as e:
-            ai_summary = "Cloud AI got confused: " + str(e)
+            ai_summary = f"Cloud AI got confused: {e}"
             print(f"AI Error: {e}")
 
     # Update Clipboard

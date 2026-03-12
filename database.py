@@ -12,7 +12,8 @@ def setup_clipboard():
             status TEXT,
             extracted_text TEXT,
             due_date TEXT,
-            summary TEXT 
+            summary TEXT,
+            filepath TEXT 
         )
     """)
     conn.commit()

@@ -291,6 +291,12 @@ html_content = """
                     
                     <label>AI FORENSIC SUMMARY:</label>
                     <div id="res-summary" class="summary-box"></div>
+                    
+                    <div id="download-container" style="display: none; margin-top: 20px;">
+                        <a id="download-link" href="#" target="_blank" style="text-decoration: none;">
+                            <button class="btn-outline" style="width: 100%; border-style: dashed;">[↓] DOWNLOAD SOURCE DATABLOCK</button>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -410,6 +416,9 @@ html_content = """
                 document.getElementById('res-summary').innerText = "";
                 document.getElementById('res-status').innerText = "NULL";
                 document.getElementById('res-status').className = "badge PENDING";
+                
+                // Ensure download button stays hidden on error
+                document.getElementById('download-container').style.display = 'none';
                 return;
             }
             
@@ -427,8 +436,20 @@ html_content = """
             const statusStr = data.status || 'PENDING';
             
             let badgeClass = 'PENDING';
-            if(statusStr.includes('COMPLETED')) badgeClass = 'COMPLETED';
-            if(statusStr.includes('PROCESSING') || statusStr.includes('Wait')) badgeClass = 'PROCESSING';
+            const downloadContainer = document.getElementById('download-container');
+            const downloadLink = document.getElementById('download-link');
+            
+            // If the document is completed, show the download button!
+            if(statusStr.includes('COMPLETED')) {
+                badgeClass = 'COMPLETED';
+                downloadContainer.style.display = 'block';
+                // Point the link to our new backend route
+                let trackNum = document.getElementById('trackingInput').value;
+                downloadLink.href = `/download/${trackNum}`;
+            } else {
+                badgeClass = statusStr.includes('PROCESSING') || statusStr.includes('Wait') ? 'PROCESSING' : 'PENDING';
+                downloadContainer.style.display = 'none'; // Hide it if not ready
+            }
             
             statusEl.innerText = statusStr.split(' - ')[0];
             statusEl.className = `badge ${badgeClass}`;

@@ -1,24 +1,22 @@
-# backroom.py
-import os
-from dotenv import load_dotenv
+# backroom.py (Top of the file)
 import sqlite3
 import pdfplumber
 from pdf2image import convert_from_path
 import pytesseract
-import google.generativeai as genai
 import asyncio
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+# The brand new Google AI Library!
+from google import genai
 
 # --- CONFIGURATION ---
-# This line unlocks the safe (reads the .env file)
 load_dotenv()
-
-# This line grabs the specific key out of the safe
 my_secret_key = os.getenv("GEMINI_API_KEY")
 
-# Now we pass the key to the AI!
-genai.configure(api_key=my_secret_key)
-model = genai.GenerativeModel('gemini-2.5-flash')
+# Create the AI client with the key from your safe
+client = genai.Client(api_key=my_secret_key)
 
 # Point it exactly to the Tesseract tool
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -54,16 +52,23 @@ def read_heavy_document(tracking_number: int, filepath: str):
     
     try:
         with pdfplumber.open(filepath) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    full_text += text + "\n"
-        
-        if full_text.strip() == "":
-            print("Backroom Reader: Magic glasses failed! Putting on the OCR Super Decoder Ring...")
-            images = convert_from_path(filepath, poppler_path=r"C:\Users\Aradhy Srivastava\poppler-25.12.0\Library\bin")
-            for img in images:
-                full_text += pytesseract.image_to_string(img) + "\n"
+            # We convert the PDF to images in the background just in case we need them
+            print("Backroom Reader: Preparing document layers...")
+            pdf_images = convert_from_path(filepath, poppler_path=r"C:\Users\Aradhy Srivastava\poppler-25.12.0\Library\bin")
+            
+            # Go through the document page by page
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                
+                # THE MAGIC TRICK: Does this page have pictures? Or is it empty?
+                if len(page.images) > 0 or text.strip() == "":
+                    print(f"Backroom Reader: Found pictures on Page {i+1}! Using OCR Decoder Ring...")
+                    # Run OCR on this specific page to capture BOTH the native text and the picture text
+                    ocr_text = pytesseract.image_to_string(pdf_images[i])
+                    full_text += ocr_text + "\n\n"
+                else:
+                    print(f"Backroom Reader: Page {i+1} is plain text. Reading normally...")
+                    full_text += text + "\n\n"
 
         status_update = "COMPLETED - Document Parsed successfully!"
     
@@ -71,6 +76,28 @@ def read_heavy_document(tracking_number: int, filepath: str):
         status_update = "ERROR - Could not read the document."
         full_text = str(e)
         print(f"Backroom Reader Error: {e}")
+
+    # The AI Summarizer
+    ai_summary = "No text to summarize."
+    if full_text.strip() != "":
+        print("Backroom Reader: Handing text to the Cloud AI for summarization...")
+        try:
+            prompt = f"Please provide a concise, 3-sentence summary of this government document:\n\n{full_text[:5000]}"
+            response = model.generate_content(prompt)
+            ai_summary = response.text
+            print("Backroom Reader: Cloud AI Summary complete!")
+        except Exception as e:
+            ai_summary = "Cloud AI got confused: " + str(e)
+            print(f"AI Error: {e}")
+
+    # Update Clipboard
+    conn = sqlite3.connect("clipboard.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE requests SET status = ?, extracted_text = ?, summary = ? WHERE id = ?", 
+                   (status_update, full_text, ai_summary, tracking_number))
+    conn.commit()
+    conn.close()
+    print(f"Backroom Reader: Finished request {tracking_number}!")
 
     # The AI Summarizer
     ai_summary = "No text to summarize."

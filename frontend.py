@@ -25,7 +25,6 @@ html_content = """
         body {
             font-family: 'Share Tech Mono', monospace;
             background-color: var(--dark-bg);
-            /* The Cyberpunk Blueprint Grid */
             background-image: 
                 linear-gradient(var(--grid-color) 1px, transparent 1px),
                 linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
@@ -53,7 +52,7 @@ html_content = """
         label { display: block; font-size: 0.85rem; color: var(--neon-cyan); margin-bottom: 8px; opacity: 0.8;}
 
         /* --- CYBERPUNK INPUTS --- */
-        input[type="text"], input[type="number"], textarea {
+        input[type="text"], input[type="number"], input[type="password"], textarea {
             width: 100%;
             padding: 12px;
             margin-bottom: 25px;
@@ -85,7 +84,6 @@ html_content = """
             cursor: pointer;
             width: 100%;
             position: relative;
-            /* Angled cuts on corners */
             clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
             transition: all 0.2s;
             display: inline-flex;
@@ -123,7 +121,6 @@ html_content = """
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
         .grid-container.gov-layout { grid-template-columns: 1.5fr 1fr; }
 
-        /* Cyberpunk Modals with glowing inset borders and top-right telemetry text */
         .card { 
             background-color: var(--card-bg); 
             padding: 30px; 
@@ -154,10 +151,9 @@ html_content = """
 
         /* --- LOBBY SPECIFIC --- */
         #login-view.active { justify-content: center; align-items: center; min-height: 80vh;}
-        .lobby-card { width: 500px; text-align: center; }
+        .lobby-card { width: 450px; text-align: center; }
         .lobby-icon { font-size: 3.5rem; color: var(--neon-cyan); margin-bottom: 10px; text-shadow: 0 0 15px var(--neon-cyan-dim); }
-        .lobby-card p { color: #888; margin-bottom: 40px; letter-spacing: 1px;}
-        .lobby-card button { margin-bottom: 20px; font-size: 1.2rem; padding: 16px;}
+        .lobby-card p { color: #888; margin-bottom: 30px; letter-spacing: 1px;}
 
         /* --- DATA TABLES --- */
         .table-container { overflow-x: auto; margin-top: 15px; border: 1px solid #333; background: rgba(0,0,0,0.5);}
@@ -207,7 +203,7 @@ html_content = """
             overflow-y: auto; 
             white-space: pre-wrap;
             font-size: 0.95rem;
-            text-transform: none; /* Keep actual document text readable */
+            text-transform: none;
         }
 
         .spinner { 
@@ -221,7 +217,6 @@ html_content = """
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Glitch text effect for main header */
         .glitch-text { position: relative; display: inline-block; }
         .glitch-text::before, .glitch-text::after {
             content: attr(data-text);
@@ -247,21 +242,30 @@ html_content = """
         <div class="card lobby-card">
             <div class="lobby-icon">SYS.REQ</div>
             <h1 class="glitch-text" data-text="FOIA DATALINK">FOIA DATALINK</h1>
-            <p>AWAITING AUTHORIZATION...</p>
-            <button onclick="showScreen('investigator-view')">INITIALIZE INVESTIGATOR_OS</button>
-            <button class="btn-red" onclick="showScreen('government-view'); loadGovRequests();">ACCESS GOV_MAINFRAME</button>
+            <p>RESTRICTED ACCESS. AUTHENTICATE BELOW.</p>
+            
+            <div style="text-align: left;">
+                <label>USERNAME</label>
+                <input type="text" id="usernameInput" placeholder="ENTER ID...">
+                
+                <label>ACCESS CODE (CIPHER)</label>
+                <input type="password" id="passwordInput" placeholder="ENTER CIPHER...">
+            </div>
+            
+            <button onclick="attemptLogin()" style="margin-bottom: 10px; width: 100%;">INITIATE SECURE HANDSHAKE</button>
+            <div id="loginReply" class="screen-reply error" style="display: none; margin-top: 15px;"></div>
         </div>
     </div>
 
     <div id="investigator-view" class="view">
         <div class="navbar">
-            <button class="btn-outline" onclick="showScreen('login-view')">[X] DISCONNECT</button>
+            <button class="btn-outline" onclick="logout()">[X] SECURE LOGOUT</button>
             <div style="font-size: 1.5rem; color: var(--neon-cyan);">INVESTIGATOR_OS // ACTIVE</div>
         </div>
         
         <div class="grid-container">
             <div class="card">
-                <h2>>> SUBMIT QUERY</h2>
+                <h2>>> SUBMIT SECURE QUERY</h2>
                 
                 <label>TARGET AGENCY</label>
                 <input type="text" id="agencyInput" placeholder="ENTER AGENCY CODE (e.g., NSA, CIA)">
@@ -279,7 +283,7 @@ html_content = """
                 <label>TRACKING ID</label>
                 <input type="number" id="trackingInput" placeholder="INPUT ID...">
                 
-                <button onclick="askBossRobot()">PING DATABASE</button>
+                <button onclick="askBossRobot()">PING SECURE DATABASE</button>
                 
                 <div id="invCheckLoading" style="display: none; text-align: center; margin-top: 20px;">
                     <div class="spinner"></div> DECRYPTING CLUSTER...
@@ -289,12 +293,12 @@ html_content = """
                     <h3 id="res-topic" style="color: #fff;"></h3>
                     <p style="margin-bottom: 20px;">STATUS: <span id="res-status" class="badge"></span></p>
                     
-                    <label>AI FORENSIC SUMMARY:</label>
+                    <label>AI FORENSIC SUMMARY (DECRYPTED):</label>
                     <div id="res-summary" class="summary-box"></div>
                     
                     <div id="download-container" style="display: none; margin-top: 20px;">
                         <a id="download-link" href="#" target="_blank" style="text-decoration: none;">
-                            <button class="btn-outline" style="width: 100%; border-style: dashed;">[↓] DOWNLOAD SOURCE DATABLOCK</button>
+                            <button class="btn-outline" style="width: 100%; border-style: dashed;">[↓] DECRYPT & DOWNLOAD DATABLOCK</button>
                         </a>
                     </div>
                 </div>
@@ -304,7 +308,7 @@ html_content = """
 
     <div id="government-view" class="view">
         <div class="navbar">
-            <button class="btn-outline" onclick="showScreen('login-view')">[X] DISCONNECT</button>
+            <button class="btn-outline" onclick="logout()">[X] SECURE LOGOUT</button>
             <div style="font-size: 1.5rem; color: var(--neon-red);">GOV_MAINFRAME // ACTIVE</div>
         </div>
         
@@ -333,7 +337,7 @@ html_content = """
             </div>
 
             <div class="card">
-                <h2>>> UPLOAD SECURE DATA</h2>
+                <h2>>> SECURE AES-256 UPLOAD</h2>
                 
                 <label>TARGET ID</label>
                 <input type="number" id="govTrackingInput" placeholder="e.g., 1004">
@@ -345,17 +349,66 @@ html_content = """
                     <div class="upload-text" id="file-name-display">INSERT PDF<br><span>OR CLICK TO BROWSE</span></div>
                 </div>
                 
-                <button class="btn-red" onclick="uploadDocument()">EXECUTE UPLOAD</button>
+                <button class="btn-red" onclick="uploadDocument()">EXECUTE ENCRYPTED UPLOAD</button>
                 <div id="govReply" class="screen-reply" style="display: none;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- UI LOGIC ---
+        // --- UI & AUTH LOGIC ---
         function showScreen(screenId) {
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+        }
+
+        function logout() {
+            document.getElementById('usernameInput').value = '';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('loginReply').style.display = 'none';
+            showScreen('login-view');
+        }
+
+        async function attemptLogin() {
+            const user = document.getElementById('usernameInput').value;
+            const pass = document.getElementById('passwordInput').value;
+            const reply = document.getElementById('loginReply');
+            
+            if(!user || !pass) {
+                reply.style.display = 'block';
+                reply.innerText = "ERR: CREDENTIALS MISSING.";
+                return;
+            }
+
+            reply.style.display = 'block';
+            reply.className = 'screen-reply';
+            reply.innerHTML = '<div class="spinner"></div> VERIFYING CIPHER...';
+            
+            try {
+                let response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                
+                let data = await response.json();
+                
+                if(data.success) {
+                    reply.style.display = 'none';
+                    if(data.role === 'investigator') {
+                        showScreen('investigator-view');
+                    } else if (data.role === 'government') {
+                        showScreen('government-view');
+                        loadGovRequests();
+                    }
+                } else {
+                    reply.className = 'screen-reply error';
+                    reply.innerText = data.error || "ERR: ACCESS DENIED.";
+                }
+            } catch (e) {
+                reply.className = 'screen-reply error';
+                reply.innerText = "ERR: MAINFRAME OFFLINE.";
+            }
         }
 
         function updateFileName() {
@@ -390,7 +443,6 @@ html_content = """
             
             replyBox.innerText = `>> TRANSMISSION SUCCESSFUL. ID: ${data.tracking_number}`;
             
-            // Clear form
             document.getElementById('agencyInput').value = '';
             document.getElementById('topicInput').value = '';
         }
@@ -416,8 +468,6 @@ html_content = """
                 document.getElementById('res-summary').innerText = "";
                 document.getElementById('res-status').innerText = "NULL";
                 document.getElementById('res-status').className = "badge PENDING";
-                
-                // Ensure download button stays hidden on error
                 document.getElementById('download-container').style.display = 'none';
                 return;
             }
@@ -439,16 +489,14 @@ html_content = """
             const downloadContainer = document.getElementById('download-container');
             const downloadLink = document.getElementById('download-link');
             
-            // If the document is completed, show the download button!
             if(statusStr.includes('COMPLETED')) {
                 badgeClass = 'COMPLETED';
                 downloadContainer.style.display = 'block';
-                // Point the link to our new backend route
                 let trackNum = document.getElementById('trackingInput').value;
                 downloadLink.href = `/download/${trackNum}`;
             } else {
                 badgeClass = statusStr.includes('PROCESSING') || statusStr.includes('Wait') ? 'PROCESSING' : 'PENDING';
-                downloadContainer.style.display = 'none'; // Hide it if not ready
+                downloadContainer.style.display = 'none'; 
             }
             
             statusEl.innerText = statusStr.split(' - ')[0];
@@ -511,7 +559,7 @@ html_content = """
             if (fileField.files.length === 0) { screen.innerText = "ERR: DATABLOCK (PDF) MISSING."; return; }
 
             screen.className = 'screen-reply';
-            screen.innerHTML = '<div class="spinner"></div> EXECUTING UPLOAD SEQUENCE...';
+            screen.innerHTML = '<div class="spinner"></div> EXECUTING SECURE AES UPLOAD...';
 
             let formData = new FormData();
             formData.append("file", fileField.files[0]);
@@ -520,13 +568,12 @@ html_content = """
             let data = await response.json();
             
             if(data.status && data.status.includes('COMPLETED') || data.message) {
-                 screen.innerText = ">> UPLOAD SEQUENCE SUCCESSFUL.";
+                 screen.innerText = ">> ENCRYPTED UPLOAD SUCCESSFUL.";
             } else {
                  screen.className = 'screen-reply error';
-                 screen.innerText = "ERR: SEQUENCE FAILED.";
+                 screen.innerText = "ERR: ENCRYPTION SEQUENCE FAILED.";
             }
             
-            // Clear inputs
             fileField.value = '';
             document.getElementById('govTrackingInput').value = '';
             updateFileName();

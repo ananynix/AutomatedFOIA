@@ -1,11 +1,15 @@
 # backroom.py
 import sqlite3
 import pdfplumber
-from pdf2image import convert_from_path
+# CHANGED: We now need to convert from raw bytes in RAM, not a file path!
+from pdf2image import convert_from_bytes 
 import pytesseract
 import asyncio
 from datetime import datetime
 import os
+import io
+import base64
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from dotenv import load_dotenv
 
 # The brand new Google AI Library!
@@ -14,6 +18,7 @@ from google import genai
 # --- CONFIGURATION ---
 load_dotenv(override=True)
 my_secret_key = os.getenv("GEMINI_API_KEY")
+aes_secret_key = os.getenv("AES_SECRET_KEY")
 
 print(f"=== DEBUG: THE KEY IS: {my_secret_key} ===")
 
@@ -49,14 +54,41 @@ async def alarm_clock_robot():
 
 # --- THE BACKROOM READERS ---
 def read_heavy_document(tracking_number: int, filepath: str):
-    print(f"Backroom Reader: Opening {filepath}...")
+    print(f"Backroom Reader: Accessing encrypted datablock at {filepath}...")
     full_text = ""
     
     try:
-        with pdfplumber.open(filepath) as pdf:
-            # We convert the PDF to images in the background just in case we need them
+        # === ZERO-TRUST IN-MEMORY DECRYPTION ===
+        print("Backroom Reader: Decrypting AES-256 payload in RAM...")
+        
+        # 1. Read the raw scrambled bytes from the hard drive
+        with open(filepath, "rb") as f:
+            encrypted_payload = f.read()
+            
+        # 2. Prepare the Decryption Key
+        key = base64.urlsafe_b64decode(aes_secret_key)
+        aesgcm = AESGCM(key)
+        
+        # 3. Separate the 12-byte cryptographic salt (nonce) from the actual data
+        nonce = encrypted_payload[:12]
+        ciphertext = encrypted_payload[12:]
+        
+        # 4. Decrypt! (This gives us the raw PDF data back)
+        decrypted_pdf_bytes = aesgcm.decrypt(nonce, ciphertext, None)
+        
+        # 5. Create a "Virtual File" in the server's RAM
+        pdf_virtual_file = io.BytesIO(decrypted_pdf_bytes)
+        
+        # === HYBRID OCR PROCESSING ===
+        # We pass the virtual RAM file to pdfplumber instead of a hard drive path
+        with pdfplumber.open(pdf_virtual_file) as pdf:
             print("Backroom Reader: Preparing document layers...")
-            pdf_images = convert_from_path(filepath, poppler_path=r"C:\Users\Aradhy Srivastava\poppler-25.12.0\Library\bin")
+            
+            # We also pass the raw bytes to Poppler instead of a file path
+            pdf_images = convert_from_bytes(
+                decrypted_pdf_bytes, 
+                poppler_path=r"C:\Users\Aradhy Srivastava\poppler-25.12.0\Library\bin"
+            )
             
             # Go through the document page by page
             for i, page in enumerate(pdf.pages):
@@ -65,7 +97,6 @@ def read_heavy_document(tracking_number: int, filepath: str):
                 # THE MAGIC TRICK: Does this page have pictures? Or is it empty?
                 if len(page.images) > 0 or text.strip() == "":
                     print(f"Backroom Reader: Found pictures on Page {i+1}! Using OCR Decoder Ring...")
-                    # Run OCR on this specific page to capture BOTH the native text and the picture text
                     ocr_text = pytesseract.image_to_string(pdf_images[i])
                     full_text += ocr_text + "\n\n"
                 else:
@@ -75,18 +106,17 @@ def read_heavy_document(tracking_number: int, filepath: str):
         status_update = "COMPLETED - Document Parsed successfully!"
     
     except Exception as e:
-        status_update = "ERROR - Could not read the document."
+        status_update = "ERROR - Cipher decryption failed or document is corrupted."
         full_text = str(e)
         print(f"Backroom Reader Error: {e}")
 
-    # === NEW: THE CLOUD AI SUMMARIZER (v2 SDK) ===
+    # === THE CLOUD AI SUMMARIZER (v2 SDK) ===
     ai_summary = "No text to summarize."
     if full_text.strip() != "":
         print("Backroom Reader: Handing text to the Cloud AI for summarization...")
         try:
-            prompt = f"Please provide a concise, 3-sentence summary of this government document:\n\n{full_text[:5000]}"
+            prompt = f"Please provide a concise, 3-sentence summary of this secure government document:\n\n{full_text[:5000]}"
             
-            # The NEW v2 syntax for generating content!
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt,
